@@ -1,0 +1,16 @@
+# Build outputs
+/V2bX
+/V2bX.exe
+/v2bx-linux-*
+/*.tar.gz
+/*.zip
+
+# Local config and runtime data
+/config.json
+/.gocache/
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

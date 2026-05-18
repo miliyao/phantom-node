@@ -1,0 +1,66 @@
+{
+  "Log": {
+    "Level": "info"
+  },
+  "Cores": [
+    {
+      "Type": "xray",
+      "Log": {
+        "Level": "warning",
+        "AccessPath": "",
+        "ErrorPath": ""
+      },
+      "AssetPath": "/etc/V2bX/",
+      "DnsConfigPath": "",
+      "RouteConfigPath": "",
+      "InboundConfigPath": "",
+      "OutboundConfigPath": "",
+      "XrayConnectionConfig": {
+        "handshake": 4,
+        "connIdle": 30,
+        "uplinkOnly": 2,
+        "downlinkOnly": 4,
+        "bufferSize": 64
+      }
+    }
+  ],
+  "Nodes": [
+    {
+      "ApiConfig": {
+        "ApiHost": "https://panel.example.com",
+        "ApiKey": "replace-with-api-key",
+        "NodeID": 1,
+        "NodeType": "vless",
+        "Timeout": 30
+      },
+      "Options": {
+        "Core": "xray",
+        "ListenIP": "0.0.0.0",
+        "SendIP": "0.0.0.0",
+        "DeviceOnlineMinTraffic": 100,
+        "ReportMinTraffic": 0,
+        "LimitConfig": {
+          "EnableRealtime": false,
+          "SpeedLimit": 0,
+          "DeviceLimit": 0,
+          "ConnLimit": 0,
+          "EnableDynamicSpeedLimit": false,
+          "DynamicSpeedLimitConfig": {
+            "Periodic": 60,
+            "Traffic": 1073741824,
+            "SpeedLimit": 10,
+            "ExpireTime": 30
+          }
+        },
+        "XrayOptions": {
+          "EnableProxyProtocol": false,
+          "EnableDNS": false,
+          "DNSType": "AsIs",
+          "EnableTFO": false,
+          "DisableSniffing": false,
+          "EnableFallback": false
+        }
+      }
+    }
+  ]
+}
