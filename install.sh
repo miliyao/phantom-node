@@ -301,6 +301,10 @@ configure_route_rules() {
         cat > "$INSTALL_DIR/outbounds.json" << 'EOF'
 [
   {
+    "tag": "direct",
+    "protocol": "freedom"
+  },
+  {
     "tag": "block",
     "protocol": "blackhole"
   }
