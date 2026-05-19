@@ -44,7 +44,7 @@ usage() {
     echo "  API_HOST=https://panel.example.com API_KEY=xxx DOWNLOAD_BASE=https://cdn.example.com bash install.sh <node_id>"
     echo ""
     echo -e "${YELLOW}Options:${NC}"
-    echo "  --node-id=ID       Xboard/V2board node id"
+    echo "  --node-id=ID       Xboard/V2board node id, comma-separated for multiple nodes"
     echo "  --panel=URL        Xboard/V2board panel host, for example https://panel.example.com"
     echo "  --token=TOKEN      UniProxy node API key"
     echo "  --download-base=URL  Base URL containing v2bx-linux-amd64 and v2bx-linux-arm64"
@@ -275,6 +275,41 @@ ensure_service_user() {
 configure() {
     echo -e "${GREEN}[3/7] Writing config...${NC}"
 
+    nodes_json=""
+    IFS=',' read -r -a node_id_list <<< "$NODE_ID"
+    for raw_node_id in "${node_id_list[@]}"; do
+        node_id="$(echo "$raw_node_id" | tr -d '[:space:]')"
+        if [ -z "$node_id" ]; then
+            continue
+        fi
+        if ! [[ "$node_id" =~ ^[0-9]+$ ]]; then
+            echo -e "${RED}Invalid node id: $node_id${NC}"
+            exit 1
+        fi
+
+        if [ -n "$nodes_json" ]; then
+            nodes_json="$nodes_json,"
+        fi
+
+        nodes_json="$nodes_json
+    {
+      \"ApiHost\": \"$API_HOST\",
+      \"ApiKey\": \"$API_KEY\",
+      \"NodeID\": $node_id,
+      \"NodeType\": \"$NODE_TYPE\",
+      \"Options\": {
+        \"Core\": \"xray\",
+        \"ListenIP\": \"0.0.0.0\",
+        \"SendIP\": \"0.0.0.0\"
+      }
+    }"
+    done
+
+    if [ -z "$nodes_json" ]; then
+        echo -e "${RED}No valid node ids provided.${NC}"
+        exit 1
+    fi
+
     cat > "$INSTALL_DIR/config.json" << EOF
 {
   "Log": {
@@ -292,17 +327,7 @@ configure() {
     }
   ],
   "Nodes": [
-    {
-      "ApiHost": "$API_HOST",
-      "ApiKey": "$API_KEY",
-      "NodeID": $NODE_ID,
-      "NodeType": "$NODE_TYPE",
-      "Options": {
-        "Core": "xray",
-        "ListenIP": "0.0.0.0",
-        "SendIP": "0.0.0.0"
-      }
-    }
+$nodes_json
   ]
 }
 EOF

@@ -74,6 +74,15 @@ bash <(curl -fsSL https://raw.githubusercontent.com/miliyao/phantom-node/main/in
   --token=your_uniproxy_api_key
 ```
 
+Multiple node ids can be deployed with one config:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/miliyao/phantom-node/main/install.sh) \
+  --node-id=1,2 \
+  --panel=https://panel.example.com \
+  --token=your_uniproxy_api_key
+```
+
 `DOWNLOAD_BASE` must contain these files:
 
 - `v2bx-linux-amd64`
