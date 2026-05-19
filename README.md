@@ -7,6 +7,7 @@ It intentionally keeps only the path used by this project:
 - Xboard/V2board UniProxy API
 - VLESS nodes
 - Xray core
+- default local block rules for BT, private IP, China IP, and China domains
 - Reality and VLESS transport options from the panel
 - user sync, traffic report, online IP report, routing block rules, and speed/device limits
 
@@ -83,6 +84,13 @@ Optional variables:
 - `INSTALL_DIR`, default `/etc/V2bX`
 - `SERVICE_NAME`, default `v2bx`
 - `NODE_TYPE`, default `vless`
+
+The installer writes default node-level route protection files on first install:
+
+- `/etc/V2bX/outbounds.json`: defines the `block` blackhole outbound
+- `/etc/V2bX/route.json`: blocks BitTorrent, private IP ranges, `geoip:cn`, and `geosite:cn`
+
+Existing `route.json` and `outbounds.json` files are kept, so custom rules are not overwritten on reinstall.
 
 ## Minimal Config
 

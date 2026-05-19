@@ -238,7 +238,9 @@ configure() {
       "Type": "xray",
       "Log": {
         "Level": "warning"
-      }
+      },
+      "RouteConfigPath": "$INSTALL_DIR/route.json",
+      "OutboundConfigPath": "$INSTALL_DIR/outbounds.json"
     }
   ],
   "Nodes": [
@@ -261,8 +263,61 @@ EOF
     echo -e "${GREEN}Config written to $INSTALL_DIR/config.json.${NC}"
 }
 
+configure_route_rules() {
+    echo -e "${GREEN}[4/5] Writing default route rules...${NC}"
+
+    if [ ! -f "$INSTALL_DIR/outbounds.json" ]; then
+        cat > "$INSTALL_DIR/outbounds.json" << 'EOF'
+[
+  {
+    "tag": "block",
+    "protocol": "blackhole"
+  }
+]
+EOF
+        chmod 600 "$INSTALL_DIR/outbounds.json"
+        echo -e "${GREEN}Created $INSTALL_DIR/outbounds.json.${NC}"
+    else
+        echo -e "${YELLOW}$INSTALL_DIR/outbounds.json exists, keeping current file.${NC}"
+    fi
+
+    if [ ! -f "$INSTALL_DIR/route.json" ]; then
+        cat > "$INSTALL_DIR/route.json" << 'EOF'
+{
+  "domainStrategy": "AsIs",
+  "rules": [
+    {
+      "type": "field",
+      "protocol": ["bittorrent"],
+      "outboundTag": "block"
+    },
+    {
+      "type": "field",
+      "ip": ["geoip:private"],
+      "outboundTag": "block"
+    },
+    {
+      "type": "field",
+      "ip": ["geoip:cn"],
+      "outboundTag": "block"
+    },
+    {
+      "type": "field",
+      "domain": ["geosite:cn"],
+      "outboundTag": "block"
+    }
+  ]
+}
+EOF
+        chmod 600 "$INSTALL_DIR/route.json"
+        echo -e "${GREEN}Created $INSTALL_DIR/route.json.${NC}"
+    else
+        echo -e "${YELLOW}$INSTALL_DIR/route.json exists, keeping current file.${NC}"
+    fi
+}
+
 create_service() {
-    echo -e "${GREEN}[4/4] Creating systemd service...${NC}"
+    echo -e "${GREEN}[5/5] Creating systemd service...${NC}"
 
     cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
 [Unit]
@@ -319,6 +374,7 @@ main() {
     fi
     download_binary
     configure
+    configure_route_rules
     create_service
     show_info
 }
