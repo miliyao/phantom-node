@@ -30,7 +30,6 @@ NODE_TYPE="${NODE_TYPE:-vless}"
 NODE_ID="${NODE_ID:-}"
 ENABLE_BBR="${ENABLE_BBR:-true}"
 ENABLE_FIREWALL="${ENABLE_FIREWALL:-true}"
-COMMON_TCP_PORTS="${COMMON_TCP_PORTS:-80,443,8080,8443}"
 GEO_ASSET_BASE="${GEO_ASSET_BASE:-https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download}"
 
 usage() {
@@ -53,7 +52,6 @@ usage() {
     echo "  --node-type=TYPE     Node type, default vless"
     echo "  --no-bbr             Skip BBR sysctl setup"
     echo "  --no-firewall        Skip iptables hardening rules"
-    echo "  --common-tcp-ports=PORTS  Allowed outbound TCP ports, default 80,443,8080,8443"
     echo "  --geo-asset-base=URL      Base URL for geoip.dat and geosite.dat"
 }
 
@@ -118,13 +116,6 @@ parse_args() {
                 ;;
             --no-firewall)
                 ENABLE_FIREWALL="false"
-                ;;
-            --common-tcp-ports=*)
-                COMMON_TCP_PORTS="${1#*=}"
-                ;;
-            --common-tcp-ports)
-                shift
-                COMMON_TCP_PORTS="${1:-}"
                 ;;
             --geo-asset-base=*)
                 GEO_ASSET_BASE="${1#*=}"
@@ -418,10 +409,6 @@ configure_firewall() {
 
     if ! iptables -C OUTPUT -m owner --uid-owner v2bx -p icmp -j REJECT 2>/dev/null; then
         iptables -A OUTPUT -m owner --uid-owner v2bx -p icmp -j REJECT
-    fi
-
-    if ! iptables -C OUTPUT -m owner --uid-owner v2bx -p tcp -m multiport ! --dports "$COMMON_TCP_PORTS" -j REJECT 2>/dev/null; then
-        iptables -A OUTPUT -m owner --uid-owner v2bx -p tcp -m multiport ! --dports "$COMMON_TCP_PORTS" -j REJECT
     fi
 
     if command -v netfilter-persistent >/dev/null 2>&1; then
