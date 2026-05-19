@@ -6,7 +6,7 @@ SERVICE_NAME="${SERVICE_NAME:-v2bx}"
 INSTALL_DIR="${INSTALL_DIR:-/etc/V2bX}"
 BASE_CONFIG="${BASE_CONFIG:-$INSTALL_DIR/config.json}"
 BIN_PATH="${BIN_PATH:-$INSTALL_DIR/V2bX}"
-RUN_ROOT="${RUN_ROOT:-/run/V2bX/google-ipv6}"
+RUN_ROOT="${RUN_ROOT:-$INSTALL_DIR/google-ipv6}"
 RUNTIME_CONFIG="$RUN_ROOT/config.json"
 RUNTIME_ROUTE="$RUN_ROOT/route.json"
 RUNTIME_OUTBOUNDS="$RUN_ROOT/outbounds.json"
@@ -54,6 +54,10 @@ check_prereqs() {
     [ -f "$BASE_CONFIG" ] || die "missing base config: $BASE_CONFIG"
     [ -f "$INSTALL_DIR/route.json" ] || die "missing original route file: $INSTALL_DIR/route.json"
     [ -f "$INSTALL_DIR/outbounds.json" ] || die "missing original outbounds file: $INSTALL_DIR/outbounds.json"
+}
+
+check_disable_prereqs() {
+    have_cmd systemctl || die "systemctl not found"
 }
 
 check_ipv6() {
@@ -175,7 +179,7 @@ write(runtime_outbounds_path, json.dumps(outbounds, ensure_ascii=False, indent=2
 write(runtime_config_path, json.dumps(runtime_config, ensure_ascii=False, indent=2) + "\n")
 PY
 
-    chown root:root "$RUN_ROOT" "$RUNTIME_CONFIG" "$RUNTIME_ROUTE" "$RUNTIME_OUTBOUNDS"
+    chown --reference="$BASE_CONFIG" "$RUN_ROOT" "$RUNTIME_CONFIG" "$RUNTIME_ROUTE" "$RUNTIME_OUTBOUNDS"
     chmod 0750 "$RUN_ROOT"
     chmod 0640 "$RUNTIME_CONFIG" "$RUNTIME_ROUTE" "$RUNTIME_OUTBOUNDS"
 }
@@ -189,20 +193,36 @@ ExecStart=$BIN_PATH server -c $RUNTIME_CONFIG
 EOF
 }
 
+remove_runtime_dir() {
+    case "$RUN_ROOT" in
+        ""|"/"|"/run"|"/etc"|"$INSTALL_DIR")
+            die "unsafe RUN_ROOT for removal: $RUN_ROOT"
+            ;;
+    esac
+
+    rm -rf "$RUN_ROOT"
+}
+
 enable_mode() {
     check_prereqs
     check_ipv6
     write_runtime_files
     write_dropin
     systemctl daemon-reload
-    systemctl restart "$SERVICE_NAME"
+    if ! systemctl restart "$SERVICE_NAME"; then
+        rm -f "$DROPIN_FILE"
+        remove_runtime_dir
+        systemctl daemon-reload
+        systemctl restart "$SERVICE_NAME" || true
+        die "failed to restart $SERVICE_NAME with Google IPv6 bypass; reverted to original config"
+    fi
     log "enabled"
 }
 
 disable_mode() {
-    check_prereqs
+    check_disable_prereqs
     rm -f "$DROPIN_FILE"
-    rm -rf "$RUN_ROOT"
+    remove_runtime_dir
     systemctl daemon-reload
     systemctl restart "$SERVICE_NAME"
     log "disabled"

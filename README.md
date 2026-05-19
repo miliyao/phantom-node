@@ -112,6 +112,30 @@ Use `--no-firewall` to skip iptables rules. TCP outbound port allowlists are int
 
 Existing `route.json` and `outbounds.json` files are kept, so custom rules are not overwritten on reinstall.
 
+## Google IPv6 Bypass
+
+The optional Google IPv6 bypass is intentionally a sidecar toggle. It does not overwrite `/etc/V2bX/route.json`, `/etc/V2bX/outbounds.json`, or `/etc/V2bX/config.json`; instead it writes generated copies under `/etc/V2bX/google-ipv6/` and uses a systemd drop-in to start V2bX with that generated config.
+
+Enable it only on servers with working public IPv6:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/miliyao/phantom-node/master/scripts/google-ipv6-toggle.sh) enable
+```
+
+Check status:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/miliyao/phantom-node/master/scripts/google-ipv6-toggle.sh) status
+```
+
+Disable and return to the original service config:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/miliyao/phantom-node/master/scripts/google-ipv6-toggle.sh) disable
+```
+
+Before enabling, the script checks that IPv6 is not disabled by sysctl, a default IPv6 route exists, a global IPv6 address exists, and public IPv6 connectivity works against `https://api64.ipify.org`. If any check fails, it exits without changing the service.
+
 ## Minimal Config
 
 See `config.example.json`.
