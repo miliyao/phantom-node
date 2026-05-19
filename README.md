@@ -88,7 +88,7 @@ Optional variables:
 The installer writes default node-level route protection files on first install:
 
 - `/etc/V2bX/outbounds.json`: defines the `block` blackhole outbound
-- `/etc/V2bX/route.json`: blocks BitTorrent, private IP ranges, `geoip:cn`, and `geosite:cn`
+- `/etc/V2bX/route.json`: uses `IPIfNonMatch` and blocks BitTorrent, private IP ranges, `geoip:cn`, and `geosite:cn`
 
 Existing `route.json` and `outbounds.json` files are kept, so custom rules are not overwritten on reinstall.
 

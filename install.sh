@@ -284,7 +284,7 @@ EOF
     if [ ! -f "$INSTALL_DIR/route.json" ]; then
         cat > "$INSTALL_DIR/route.json" << 'EOF'
 {
-  "domainStrategy": "AsIs",
+  "domainStrategy": "IPIfNonMatch",
   "rules": [
     {
       "type": "field",
