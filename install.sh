@@ -29,6 +29,9 @@ SERVICE_NAME="${SERVICE_NAME:-v2bx}"
 NODE_TYPE="${NODE_TYPE:-vless}"
 NODE_ID="${NODE_ID:-}"
 ENABLE_BBR="${ENABLE_BBR:-true}"
+ENABLE_FIREWALL="${ENABLE_FIREWALL:-true}"
+COMMON_TCP_PORTS="${COMMON_TCP_PORTS:-80,443,8080,8443}"
+GEO_ASSET_BASE="${GEO_ASSET_BASE:-https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download}"
 
 usage() {
     echo -e "${RED}Usage:${NC}"
@@ -49,6 +52,9 @@ usage() {
     echo "  --service-name=NAME  systemd service name, default v2bx"
     echo "  --node-type=TYPE     Node type, default vless"
     echo "  --no-bbr             Skip BBR sysctl setup"
+    echo "  --no-firewall        Skip iptables hardening rules"
+    echo "  --common-tcp-ports=PORTS  Allowed outbound TCP ports, default 80,443,8080,8443"
+    echo "  --geo-asset-base=URL      Base URL for geoip.dat and geosite.dat"
 }
 
 parse_args() {
@@ -109,6 +115,23 @@ parse_args() {
                 ;;
             --no-bbr)
                 ENABLE_BBR="false"
+                ;;
+            --no-firewall)
+                ENABLE_FIREWALL="false"
+                ;;
+            --common-tcp-ports=*)
+                COMMON_TCP_PORTS="${1#*=}"
+                ;;
+            --common-tcp-ports)
+                shift
+                COMMON_TCP_PORTS="${1:-}"
+                ;;
+            --geo-asset-base=*)
+                GEO_ASSET_BASE="${1#*=}"
+                ;;
+            --geo-asset-base)
+                shift
+                GEO_ASSET_BASE="${1:-}"
                 ;;
             --*)
                 echo -e "${RED}Unknown option: $1${NC}"
@@ -225,8 +248,14 @@ download_binary() {
     echo -e "${GREEN}Binary installed.${NC}"
 }
 
+ensure_service_user() {
+    if ! id -u v2bx >/dev/null 2>&1; then
+        useradd --system --no-create-home --shell /usr/sbin/nologin v2bx
+    fi
+}
+
 configure() {
-    echo -e "${GREEN}[3/4] Writing config...${NC}"
+    echo -e "${GREEN}[3/7] Writing config...${NC}"
 
     cat > "$INSTALL_DIR/config.json" << EOF
 {
@@ -240,7 +269,8 @@ configure() {
         "Level": "warning"
       },
       "RouteConfigPath": "$INSTALL_DIR/route.json",
-      "OutboundConfigPath": "$INSTALL_DIR/outbounds.json"
+      "OutboundConfigPath": "$INSTALL_DIR/outbounds.json",
+      "DnsConfigPath": "$INSTALL_DIR/dns.json"
     }
   ],
   "Nodes": [
@@ -259,7 +289,8 @@ configure() {
 }
 EOF
 
-    chmod 600 "$INSTALL_DIR/config.json"
+    chown root:v2bx "$INSTALL_DIR/config.json"
+    chmod 640 "$INSTALL_DIR/config.json"
     echo -e "${GREEN}Config written to $INSTALL_DIR/config.json.${NC}"
 }
 
@@ -275,10 +306,13 @@ configure_route_rules() {
   }
 ]
 EOF
-        chmod 600 "$INSTALL_DIR/outbounds.json"
+        chown root:v2bx "$INSTALL_DIR/outbounds.json"
+        chmod 640 "$INSTALL_DIR/outbounds.json"
         echo -e "${GREEN}Created $INSTALL_DIR/outbounds.json.${NC}"
     else
         echo -e "${YELLOW}$INSTALL_DIR/outbounds.json exists, keeping current file.${NC}"
+        chown root:v2bx "$INSTALL_DIR/outbounds.json"
+        chmod 640 "$INSTALL_DIR/outbounds.json"
     fi
 
     if [ ! -f "$INSTALL_DIR/route.json" ]; then
@@ -305,19 +339,97 @@ EOF
       "type": "field",
       "domain": ["geosite:cn"],
       "outboundTag": "block"
+    },
+    {
+      "type": "field",
+      "domain": ["geosite:category-ads-all"],
+      "outboundTag": "block"
     }
   ]
 }
 EOF
-        chmod 600 "$INSTALL_DIR/route.json"
+        chown root:v2bx "$INSTALL_DIR/route.json"
+        chmod 640 "$INSTALL_DIR/route.json"
         echo -e "${GREEN}Created $INSTALL_DIR/route.json.${NC}"
     else
         echo -e "${YELLOW}$INSTALL_DIR/route.json exists, keeping current file.${NC}"
+        chown root:v2bx "$INSTALL_DIR/route.json"
+        chmod 640 "$INSTALL_DIR/route.json"
+    fi
+
+    if [ ! -f "$INSTALL_DIR/dns.json" ]; then
+        cat > "$INSTALL_DIR/dns.json" << 'EOF'
+{
+  "servers": [
+    "8.8.8.8",
+    "1.1.1.1"
+  ]
+}
+EOF
+        chown root:v2bx "$INSTALL_DIR/dns.json"
+        chmod 640 "$INSTALL_DIR/dns.json"
+        echo -e "${GREEN}Created $INSTALL_DIR/dns.json.${NC}"
+    else
+        echo -e "${YELLOW}$INSTALL_DIR/dns.json exists, keeping current file.${NC}"
+        chown root:v2bx "$INSTALL_DIR/dns.json"
+        chmod 640 "$INSTALL_DIR/dns.json"
+    fi
+}
+
+download_geo_assets() {
+    echo -e "${GREEN}[5/7] Ensuring geo assets...${NC}"
+
+    for asset in geoip.dat geosite.dat; do
+        path="$INSTALL_DIR/$asset"
+        if [ -f "$path" ]; then
+            echo -e "${YELLOW}$path exists, keeping current file.${NC}"
+            chown root:v2bx "$path"
+            chmod 640 "$path"
+            continue
+        fi
+
+        url="${GEO_ASSET_BASE%/}/$asset"
+        echo -e "${YELLOW}Downloading $asset from $url${NC}"
+        if ! wget -q --show-progress -O "$path" "$url"; then
+            echo -e "${RED}Failed to download $asset. geoip/geosite route rules require this file.${NC}"
+            exit 1
+        fi
+        chown root:v2bx "$path"
+        chmod 640 "$path"
+    done
+}
+
+configure_firewall() {
+    if [ "$ENABLE_FIREWALL" != "true" ]; then
+        echo -e "${YELLOW}[6/7] Skipping firewall hardening.${NC}"
+        return
+    fi
+
+    echo -e "${GREEN}[6/7] Applying firewall hardening...${NC}"
+
+    if ! command -v iptables >/dev/null 2>&1; then
+        echo -e "${YELLOW}iptables not found, skipping firewall hardening.${NC}"
+        return
+    fi
+
+    if ! iptables -C OUTPUT -m owner --uid-owner v2bx -p icmp -j REJECT 2>/dev/null; then
+        iptables -A OUTPUT -m owner --uid-owner v2bx -p icmp -j REJECT
+    fi
+
+    if ! iptables -C OUTPUT -m owner --uid-owner v2bx -p tcp -m multiport ! --dports "$COMMON_TCP_PORTS" -j REJECT 2>/dev/null; then
+        iptables -A OUTPUT -m owner --uid-owner v2bx -p tcp -m multiport ! --dports "$COMMON_TCP_PORTS" -j REJECT
+    fi
+
+    if command -v netfilter-persistent >/dev/null 2>&1; then
+        netfilter-persistent save >/dev/null 2>&1 || true
+    elif command -v iptables-save >/dev/null 2>&1; then
+        mkdir -p /etc/iptables
+        iptables-save > /etc/iptables/rules.v4
     fi
 }
 
 create_service() {
-    echo -e "${GREEN}[5/5] Creating systemd service...${NC}"
+    echo -e "${GREEN}[7/7] Creating systemd service...${NC}"
 
     cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
 [Unit]
@@ -326,6 +438,10 @@ After=network.target
 
 [Service]
 Type=simple
+User=v2bx
+Group=v2bx
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 ExecStart=$INSTALL_DIR/V2bX server -c $INSTALL_DIR/config.json
 Restart=on-failure
 RestartSec=5
@@ -372,9 +488,12 @@ main() {
     else
         echo -e "${YELLOW}[1/4] Skipping BBR setup.${NC}"
     fi
+    ensure_service_user
     download_binary
     configure
     configure_route_rules
+    download_geo_assets
+    configure_firewall
     create_service
     show_info
 }

@@ -88,7 +88,16 @@ Optional variables:
 The installer writes default node-level route protection files on first install:
 
 - `/etc/V2bX/outbounds.json`: defines the `block` blackhole outbound
-- `/etc/V2bX/route.json`: uses `IPIfNonMatch` and blocks BitTorrent, private IP ranges, `geoip:cn`, and `geosite:cn`
+- `/etc/V2bX/route.json`: uses `IPIfNonMatch` and blocks BitTorrent, private IP ranges, `geoip:cn`, `geosite:cn`, and `geosite:category-ads-all`
+- `/etc/V2bX/dns.json`: uses `8.8.8.8` and `1.1.1.1` as a minimal DNS fallback
+- `/etc/V2bX/geoip.dat` and `/etc/V2bX/geosite.dat`: downloaded automatically for `geoip:` and `geosite:` rules
+
+The installer also creates a dedicated `v2bx` system user and applies owner-based iptables hardening by default:
+
+- rejects ICMP sent by the `v2bx` process
+- rejects outbound TCP from `v2bx` except common ports `80,443,8080,8443`
+
+Use `--no-firewall` to skip iptables rules, or `--common-tcp-ports=80,443,8080,8443,5222` to customize allowed outbound TCP ports.
 
 Existing `route.json` and `outbounds.json` files are kept, so custom rules are not overwritten on reinstall.
 
