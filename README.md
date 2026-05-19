@@ -84,6 +84,9 @@ Optional variables:
 - `INSTALL_DIR`, default `/etc/V2bX`
 - `SERVICE_NAME`, default `v2bx`
 - `NODE_TYPE`, default `vless`
+- `TIMEZONE`, default `Asia/Shanghai`
+
+The installer sets the system timezone to `Asia/Shanghai` by default. Override it with `--timezone=UTC` or another valid timezone when needed.
 
 The installer writes default node-level route protection files on first install:
 

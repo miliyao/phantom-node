@@ -31,6 +31,7 @@ NODE_ID="${NODE_ID:-}"
 ENABLE_BBR="${ENABLE_BBR:-true}"
 ENABLE_FIREWALL="${ENABLE_FIREWALL:-true}"
 GEO_ASSET_BASE="${GEO_ASSET_BASE:-https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download}"
+TIMEZONE="${TIMEZONE:-Asia/Shanghai}"
 
 usage() {
     echo -e "${RED}Usage:${NC}"
@@ -53,6 +54,7 @@ usage() {
     echo "  --no-bbr             Skip BBR sysctl setup"
     echo "  --no-firewall        Skip iptables hardening rules"
     echo "  --geo-asset-base=URL      Base URL for geoip.dat and geosite.dat"
+    echo "  --timezone=TZ       System timezone, default Asia/Shanghai"
 }
 
 parse_args() {
@@ -124,6 +126,13 @@ parse_args() {
                 shift
                 GEO_ASSET_BASE="${1:-}"
                 ;;
+            --timezone=*)
+                TIMEZONE="${1#*=}"
+                ;;
+            --timezone)
+                shift
+                TIMEZONE="${1:-}"
+                ;;
             --*)
                 echo -e "${RED}Unknown option: $1${NC}"
                 usage
@@ -167,6 +176,24 @@ if [ "$EUID" -ne 0 ]; then
     echo -e "${RED}Please run as root.${NC}"
     exit 1
 fi
+
+configure_timezone() {
+    echo -e "${GREEN}[1/8] Setting timezone to $TIMEZONE...${NC}"
+
+    if [ -z "$TIMEZONE" ]; then
+        echo -e "${YELLOW}Timezone is empty, skipping.${NC}"
+        return
+    fi
+
+    if command -v timedatectl >/dev/null 2>&1; then
+        timedatectl set-timezone "$TIMEZONE"
+    elif [ -f "/usr/share/zoneinfo/$TIMEZONE" ]; then
+        ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
+        echo "$TIMEZONE" > /etc/timezone
+    else
+        echo -e "${YELLOW}Timezone data for $TIMEZONE not found, skipping.${NC}"
+    fi
+}
 
 detect_arch() {
     ARCH=$(uname -m)
@@ -473,6 +500,7 @@ show_info() {
 }
 
 main() {
+    configure_timezone
     detect_arch
     if [ "$ENABLE_BBR" = "true" ]; then
         enable_bbr
