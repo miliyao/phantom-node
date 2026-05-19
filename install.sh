@@ -3,6 +3,12 @@
 # V2bX private lite installer: Xboard/V2board UniProxy + VLESS + Xray.
 #
 # Usage:
+#   bash <(curl -fsSL https://raw.githubusercontent.com/miliyao/phantom-node/main/install.sh) \
+#     --node-id=1 \
+#     --panel=https://panel.example.com \
+#     --token=your_uniproxy_api_key
+#
+# Alternative:
 #   API_HOST=https://panel.example.com API_KEY=xxx DOWNLOAD_BASE=https://cdn.example.com bash install.sh <node_id>
 #
 # Optional:
@@ -17,39 +23,125 @@ NC='\033[0m'
 
 API_HOST="${API_HOST:-}"
 API_KEY="${API_KEY:-}"
-DOWNLOAD_BASE="${DOWNLOAD_BASE:-}"
+DOWNLOAD_BASE="${DOWNLOAD_BASE:-https://github.com/miliyao/phantom-node/releases/latest/download}"
 INSTALL_DIR="${INSTALL_DIR:-/etc/V2bX}"
 SERVICE_NAME="${SERVICE_NAME:-v2bx}"
 NODE_TYPE="${NODE_TYPE:-vless}"
+NODE_ID="${NODE_ID:-}"
+ENABLE_BBR="${ENABLE_BBR:-true}"
 
 usage() {
     echo -e "${RED}Usage:${NC}"
+    echo "  bash <(curl -fsSL https://raw.githubusercontent.com/miliyao/phantom-node/main/install.sh) \\"
+    echo "    --node-id=1 \\"
+    echo "    --panel=https://panel.example.com \\"
+    echo "    --token=your_uniproxy_api_key"
+    echo ""
+    echo -e "${YELLOW}Alternative:${NC}"
     echo "  API_HOST=https://panel.example.com API_KEY=xxx DOWNLOAD_BASE=https://cdn.example.com bash install.sh <node_id>"
     echo ""
-    echo -e "${YELLOW}Required environment:${NC}"
-    echo "  API_HOST       Xboard/V2board panel host, for example https://panel.example.com"
-    echo "  API_KEY        UniProxy node API key"
-    echo "  DOWNLOAD_BASE  Base URL containing v2bx-linux-amd64 and v2bx-linux-arm64"
+    echo -e "${YELLOW}Options:${NC}"
+    echo "  --node-id=ID       Xboard/V2board node id"
+    echo "  --panel=URL        Xboard/V2board panel host, for example https://panel.example.com"
+    echo "  --token=TOKEN      UniProxy node API key"
+    echo "  --download-base=URL  Base URL containing v2bx-linux-amd64 and v2bx-linux-arm64"
+    echo "  --install-dir=PATH   Install directory, default /etc/V2bX"
+    echo "  --service-name=NAME  systemd service name, default v2bx"
+    echo "  --node-type=TYPE     Node type, default vless"
+    echo "  --no-bbr             Skip BBR sysctl setup"
 }
 
-if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
-    usage
-    exit 0
-fi
+parse_args() {
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            --node-id=*)
+                NODE_ID="${1#*=}"
+                ;;
+            --node-id)
+                shift
+                NODE_ID="${1:-}"
+                ;;
+            --panel=*)
+                API_HOST="${1#*=}"
+                ;;
+            --panel)
+                shift
+                API_HOST="${1:-}"
+                ;;
+            --token=*)
+                API_KEY="${1#*=}"
+                ;;
+            --token)
+                shift
+                API_KEY="${1:-}"
+                ;;
+            --download-base=*)
+                DOWNLOAD_BASE="${1#*=}"
+                ;;
+            --download-base)
+                shift
+                DOWNLOAD_BASE="${1:-}"
+                ;;
+            --install-dir=*)
+                INSTALL_DIR="${1#*=}"
+                ;;
+            --install-dir)
+                shift
+                INSTALL_DIR="${1:-}"
+                ;;
+            --service-name=*)
+                SERVICE_NAME="${1#*=}"
+                ;;
+            --service-name)
+                shift
+                SERVICE_NAME="${1:-}"
+                ;;
+            --node-type=*)
+                NODE_TYPE="${1#*=}"
+                ;;
+            --node-type)
+                shift
+                NODE_TYPE="${1:-}"
+                ;;
+            --no-bbr)
+                ENABLE_BBR="false"
+                ;;
+            --*)
+                echo -e "${RED}Unknown option: $1${NC}"
+                usage
+                exit 1
+                ;;
+            *)
+                if [ -z "$NODE_ID" ]; then
+                    NODE_ID="$1"
+                else
+                    echo -e "${RED}Unexpected argument: $1${NC}"
+                    usage
+                    exit 1
+                fi
+                ;;
+        esac
+        shift
+    done
+}
 
-if [ -z "${1:-}" ]; then
+parse_args "$@"
+
+if [ -z "$NODE_ID" ]; then
     echo -e "${RED}Error: missing node id.${NC}"
     usage
     exit 1
 fi
 
-if [ -z "$API_HOST" ] || [ -z "$API_KEY" ] || [ -z "$DOWNLOAD_BASE" ]; then
-    echo -e "${RED}Error: API_HOST, API_KEY and DOWNLOAD_BASE are required.${NC}"
+if [ -z "$API_HOST" ] || [ -z "$API_KEY" ]; then
+    echo -e "${RED}Error: --panel and --token are required.${NC}"
     usage
     exit 1
 fi
-
-NODE_ID="$1"
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}      V2bX Private Lite Installer${NC}"
@@ -220,7 +312,11 @@ show_info() {
 
 main() {
     detect_arch
-    enable_bbr
+    if [ "$ENABLE_BBR" = "true" ]; then
+        enable_bbr
+    else
+        echo -e "${YELLOW}[1/4] Skipping BBR setup.${NC}"
+    fi
     download_binary
     configure
     create_service

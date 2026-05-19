@@ -64,6 +64,15 @@ DOWNLOAD_BASE=https://download.example.com \
 bash install.sh 1
 ```
 
+Or deploy directly from GitHub with release binaries:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/miliyao/phantom-node/main/install.sh) \
+  --node-id=1 \
+  --panel=https://panel.example.com \
+  --token=your_uniproxy_api_key
+```
+
 `DOWNLOAD_BASE` must contain these files:
 
 - `v2bx-linux-amd64`
